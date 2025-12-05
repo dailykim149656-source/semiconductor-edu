@@ -13,15 +13,15 @@ from docx import Document
 
 
 class ResumeAnalyzer:
-    """이력서/자소서 분석 및 맞춤형 질문 생성"""
-    
     def __init__(self):
         self.openai_client = AzureOpenAI(
+            # 현재 Azure 설정과 일치
             api_key=os.getenv("AZURE_OPENAI_KEY"),
             api_version="2024-02-15-preview",
             azure_endpoint=os.getenv("AZURE_OPENAI_ENDPOINT")
         )
-        self.gpt_deployment = os.getenv("GPT_DEPLOYMENT_NAME", "gpt-4")
+        # AZURE_OPENAI_DEPLOYMENT를 사용하도록 수정
+        self.gpt_deployment = os.getenv("AZURE_OPENAI_DEPLOYMENT", "gpt-4o-mini")
     
     def extract_text_from_pdf(self, pdf_path: str) -> str:
         """PDF에서 텍스트 추출"""
