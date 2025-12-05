@@ -1668,42 +1668,24 @@ def main():
         # Gradio UI 생성
         demo = create_gradio_interface(simulator)
         
-        # 배포 환경 감지
-        is_azure = os.getenv("WEBSITE_SITE_NAME") is not None  # Azure App Service
-        is_production = os.getenv("ENVIRONMENT", "local").lower() == "production"
-        
-        # 서버 설정
-        if is_azure or is_production:
-            # Azure App Service 또는 프로덕션 환경
-            port = int(os.getenv('GRADIO_SERVER_PORT', 8000))
-            server_name = os.getenv('GRADIO_SERVER_NAME', '0.0.0.0')
-            share = False
-            inbrowser = False
-        else:
-            # 로컬 개발 환경
-            port = int(os.getenv('GRADIO_SERVER_PORT', 7860))
-            server_name = os.getenv('GRADIO_SERVER_NAME', '127.0.0.1')
-            share = os.getenv('GRADIO_SHARE', 'False').lower() == 'true'
-            inbrowser = True
-        
-        env_name = "Azure App Service" if is_azure else ("프로덕션" if is_production else "로컬")
+        # 서버 실행
+        port = int(os.getenv('GRADIO_SERVER_PORT', 7860))
+        server_name = os.getenv('GRADIO_SERVER_NAME', '0.0.0.0')
+        share = os.getenv('GRADIO_SHARE', 'false').lower() == 'true'
         
         logger.info(f"""
         ╔══════════════════════════════════════════════════════════╗
         ║  🎓 반도체 공정 학습 & 면접 시뮬레이터 시작            ║
         ║                                                          ║
-        ║  환경: {env_name:<45} ║
-        ║  서버: {server_name}:{port:<40} ║
-        ║  URL: {'https://' + os.getenv('WEBSITE_HOSTNAME', f'http://localhost:{port}'):<45} ║
+        ║  URL: http://localhost:{port}                     ║
+        ║  환경: {os.getenv('ENVIRONMENT', 'local').upper()}                                              ║
         ╚══════════════════════════════════════════════════════════╝
         """)
         
         demo.launch(
             server_name=server_name,
             server_port=port,
-            share=share,
-            inbrowser=inbrowser,
-            show_error=True
+            share=share
         )
     
     except Exception as e:
@@ -1717,25 +1699,8 @@ def main():
         2. API 키가 올바르게 설정되었는지 확인
         3. 필요한 패키지가 설치되었는지 확인 (pip install -r requirements.txt)
         """)
-        import traceback
-        logger.debug(traceback.format_exc())
         sys.exit(1)
 
 
 if __name__ == "__main__":
-    import os
-    
-    simulator = SemiconductorSimulator()
-    demo = create_gradio_interface(simulator)
-    
-    # Azure App Service 설정
-    server_name = os.getenv("GRADIO_SERVER_NAME", "0.0.0.0")
-    server_port = int(os.getenv("GRADIO_SERVER_PORT", "8000"))
-    
-    demo.launch(
-        server_name=server_name,
-        server_port=server_port,
-        share=False,
-        show_error=True,
-        auth=None  # 또는 ("admin", "password123") - 인증 추가
-    )
+    main()
