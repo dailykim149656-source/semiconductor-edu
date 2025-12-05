@@ -45,17 +45,18 @@ def initialize_azure_clients():
     try:
         # Azure OpenAI 우선 시도
         azure_endpoint = os.getenv('AZURE_OPENAI_ENDPOINT')
-        azure_key = os.getenv('AZURE_OPENAI_API_KEY')
+        azure_key = os.getenv('AZURE_OPENAI_KEY')
         
         if azure_endpoint and azure_key:
             from openai import AzureOpenAI
             clients['openai'] = AzureOpenAI(
                 api_key=azure_key,
-                api_version=os.getenv('AZURE_OPENAI_API_VERSION', '2024-02-15-preview'),
+                # AZURE_OPENAI_API_VERSION은 Azure에 설정이 없으므로, 기본값을 사용하거나 제거하는 것이 좋습니다.
+                api_version=os.getenv('AZURE_OPENAI_API_VERSION', '2024-02-15-preview'), 
                 azure_endpoint=azure_endpoint
             )
             clients['openai_type'] = 'azure'
-            clients['gpt_model'] = os.getenv('AZURE_OPENAI_DEPLOYMENT_NAME', 'gpt-4')
+            clients['gpt_model'] = os.getenv('AZURE_OPENAI_DEPLOYMENT', 'gpt-4') 
             logger.info("✅ Azure OpenAI 클라이언트 초기화 성공")
         
         else:
@@ -65,7 +66,7 @@ def initialize_azure_clients():
                 from openai import OpenAI
                 clients['openai'] = OpenAI(api_key=openai_key)
                 clients['openai_type'] = 'openai'
-                clients['gpt_model'] = 'gpt-4-turbo-preview'
+                clients['gpt_model'] = 'gpt-4o-mini'
                 logger.info("✅ OpenAI 클라이언트 초기화 성공")
             else:
                 raise ValueError("OpenAI API 키가 설정되지 않았습니다")
@@ -111,7 +112,8 @@ def initialize_azure_clients():
         
         search_endpoint = os.getenv('AZURE_SEARCH_ENDPOINT')
         search_key = os.getenv('AZURE_SEARCH_KEY')
-        index_name = os.getenv('AZURE_SEARCH_INDEX_NAME', 'semiconductor-knowledge')
+        # 현재 Azure 설정: AZURE_SEARCH_INDEX
+        index_name = os.getenv('AZURE_SEARCH_INDEX', 'semiconductor-knowledge') # 👈 AZURE_SEARCH_INDEX 사용
         
         if search_endpoint and search_key:
             clients['search'] = SearchClient(
@@ -119,7 +121,7 @@ def initialize_azure_clients():
                 index_name=index_name,
                 credential=AzureKeyCredential(search_key)
             )
-            clients['search_index'] = index_name
+            clients['search_index'] = index_name # 👈 AZURE_SEARCH_INDEX 사용
             logger.info(f"✅ Azure AI Search 클라이언트 초기화 성공 (인덱스: {index_name})")
         else:
             raise ValueError("Azure Search 키가 설정되지 않았습니다")
@@ -1668,24 +1670,42 @@ def main():
         # Gradio UI 생성
         demo = create_gradio_interface(simulator)
         
-        # 서버 실행
-        port = int(os.getenv('GRADIO_SERVER_PORT', 7860))
-        server_name = os.getenv('GRADIO_SERVER_NAME', '0.0.0.0')
-        share = os.getenv('GRADIO_SHARE', 'false').lower() == 'true'
+        # 배포 환경 감지
+        is_azure = os.getenv("WEBSITE_SITE_NAME") is not None  # Azure App Service
+        is_production = os.getenv("ENVIRONMENT", "local").lower() == "production"
+        
+        # 서버 설정
+        if is_azure or is_production:
+            # Azure App Service 또는 프로덕션 환경
+            port = int(os.getenv('GRADIO_SERVER_PORT', 8000))
+            server_name = os.getenv('GRADIO_SERVER_NAME', '0.0.0.0')
+            share = False
+            inbrowser = False
+        else:
+            # 로컬 개발 환경
+            port = int(os.getenv('GRADIO_SERVER_PORT', 7860))
+            server_name = os.getenv('GRADIO_SERVER_NAME', '127.0.0.1')
+            share = os.getenv('GRADIO_SHARE', 'False').lower() == 'true'
+            inbrowser = True
+        
+        env_name = "Azure App Service" if is_azure else ("프로덕션" if is_production else "로컬")
         
         logger.info(f"""
         ╔══════════════════════════════════════════════════════════╗
         ║  🎓 반도체 공정 학습 & 면접 시뮬레이터 시작            ║
         ║                                                          ║
-        ║  URL: http://localhost:{port}                     ║
-        ║  환경: {os.getenv('ENVIRONMENT', 'local').upper()}                                              ║
+        ║  환경: {env_name:<45} ║
+        ║  서버: {server_name}:{port:<40} ║
+        ║  URL: {'https://' + os.getenv('WEBSITE_HOSTNAME', f'http://localhost:{port}'):<45} ║
         ╚══════════════════════════════════════════════════════════╝
         """)
         
         demo.launch(
             server_name=server_name,
             server_port=port,
-            share=share
+            share=share,
+            inbrowser=inbrowser,
+            show_error=True
         )
     
     except Exception as e:
@@ -1699,8 +1719,28 @@ def main():
         2. API 키가 올바르게 설정되었는지 확인
         3. 필요한 패키지가 설치되었는지 확인 (pip install -r requirements.txt)
         """)
+        import traceback
+        logger.debug(traceback.format_exc())
         sys.exit(1)
 
-
 if __name__ == "__main__":
+    # 이 부분을 아래와 같이 main() 함수 호출로 변경하세요.
     main()
+
+'''if __name__ == "__main__":
+    import os
+    
+    simulator = SemiconductorSimulator()
+    demo = create_gradio_interface(simulator)
+    
+    # Azure App Service 설정
+    server_name = os.getenv("GRADIO_SERVER_NAME", "0.0.0.0")
+    server_port = int(os.getenv("GRADIO_SERVER_PORT", "8000"))
+    
+    demo.launch(
+        server_name=server_name,
+        server_port=server_port,
+        share=False,
+        show_error=True,
+        auth=None  # 또는 ("admin", "password123") - 인증 추가
+    )'''
